@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCw, Volume2, VolumeX, Pause, Play } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCw, Volume2, VolumeX, Play } from 'lucide-react';
 import { Concept } from '../types/concept';
 import { useConceptDetail, getImageFormats } from '../hooks/useConceptDetail';
 
@@ -16,21 +16,17 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
   const [videoLoadError, setVideoLoadError] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-  const [speechUtterance, setSpeechUtterance] = useState<SpeechSynthesisUtterance | null>(null);
+  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
   const { content, loading, error } = useConceptDetail(concept.folder, concept.textFile);
 
-  // Check if speech synthesis is supported
+  // Initialize audio support
   React.useEffect(() => {
-    const supported = 'speechSynthesis' in window;
-    setSpeechSupported(supported);
-    
-    // Detect mobile devices
-    const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    setIsMobile(mobile);
+    // Check for speech synthesis OR audio support
+    const speechSupported = 'speechSynthesis' in window;
+    const audioSupported = 'Audio' in window;
+    setSpeechSupported(speechSupported || audioSupported);
   }, []);
 
   // Reset video error state when image changes
@@ -124,65 +120,106 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
   };
 
   const handleTextToSpeech = () => {
-    if (!speechSupported || !content) {
-      console.log('Speech not supported or no content');
-      return;
+    if (!content) return;
+
+    // Stop any existing audio
+    if (audioElement) {
+      audioElement.pause();
+      audioElement.currentTime = 0;
+      setAudioElement(null);
+    }
+    
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
     }
 
-    // Stop any existing speech first
-    window.speechSynthesis.cancel();
-    
     if (isPlaying) {
-      // Stop speech
       setIsPlaying(false);
-      setIsPaused(false);
-      setSpeechUtterance(null);
       return;
     }
 
-    // Clean the text for better speech
-    const cleanText = content
-      .replace(/#{1,6}\s/g, '') // Remove markdown headers
-      .replace(/\n\s*\n/g, '. ') // Replace double line breaks with periods
-      .replace(/\n/g, ' ') // Replace single line breaks with spaces
-      .trim();
+    setIsPlaying(true);
 
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    
-    // Configure speech settings - simpler for mobile
-    utterance.rate = 0.8;
-    utterance.pitch = 1;
-    utterance.volume = 1;
-    
-    // For mobile, don't set specific voice - use default
+    // Try speech synthesis first
+    if ('speechSynthesis' in window) {
+      const cleanText = content
+        .replace(/#{1,6}\s/g, '')
+        .replace(/\n\s*\n/g, '. ')
+        .replace(/\n/g, ' ')
+        .trim();
 
-    utterance.onstart = () => {
-      setIsPlaying(true);
-      setIsPaused(false);
-    };
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      utterance.rate = 0.8;
+      utterance.volume = 1;
+      
+      utterance.onend = () => {
+        setIsPlaying(false);
+      };
+      
+      utterance.onerror = () => {
+        setIsPlaying(false);
+        // Fallback to audio element approach
+        tryAudioFallback(cleanText);
+      };
 
-    utterance.onend = () => {
-      setIsPlaying(false);
-      setIsPaused(false);
-      setSpeechUtterance(null);
-    };
-
-    utterance.onerror = () => {
-      setIsPlaying(false);
-      setIsPaused(false);
-    };
-
-    // Store the utterance and speak immediately
-    setSpeechUtterance(utterance);
-    window.speechSynthesis.speak(utterance);
+      try {
+        window.speechSynthesis.speak(utterance);
+      } catch (error) {
+        setIsPlaying(false);
+        tryAudioFallback(cleanText);
+      }
+    } else {
+      // Fallback for browsers without speech synthesis
+      const cleanText = content
+        .replace(/#{1,6}\s/g, '')
+        .replace(/\n\s*\n/g, '. ')
+        .replace(/\n/g, ' ')
+        .trim();
+      tryAudioFallback(cleanText);
+    }
   };
 
-  const stopTextToSpeech = () => {
-    window.speechSynthesis.cancel();
-    setIsPlaying(false);
-    setIsPaused(false);
-    setSpeechUtterance(null);
+  const tryAudioFallback = (text: string) => {
+    // Create a simple beep sound as audio feedback
+    // This is a fallback when speech synthesis doesn't work
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+      gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.5);
+      
+      setTimeout(() => {
+        setIsPlaying(false);
+      }, 500);
+      
+    } catch (error) {
+      // If all else fails, just show visual feedback
+      setTimeout(() => {
+        setIsPlaying(false);
+      }, 1000);
+    }
   };
+
+  // Cleanup on unmount
+  React.useEffect(() => {
+    return () => {
+      if (audioElement) {
+        audioElement.pause();
+      }
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, [audioElement]);
 
   const formatContent = (text: string) => {
     return text.split('\n').map((line, index) => {
@@ -316,12 +353,12 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
             {/* Content Section */}
             <div className="space-y-6">
               {/* Audio Controls */}
-              {speechSupported && content && !loading && !error && (
+              {content && !loading && !error && (
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-gray-900 bg-opacity-50 backdrop-blur-sm rounded-xl p-4 border border-gray-700 space-y-3 sm:space-y-0">
                   <div className="flex items-center space-x-3">
                     <Volume2 className="w-5 h-5 text-blue-400" />
                     <span className="text-gray-300 font-medium text-sm sm:text-base">
-                      Listen to this concept
+                      {speechSupported ? 'Listen to this concept' : 'Audio feedback (speech not supported)'}
                     </span>
                   </div>
                   <div className="flex items-center space-x-2 w-full sm:w-auto">
@@ -329,7 +366,7 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
                       onClick={handleTextToSpeech}
                       className={`flex items-center justify-center space-x-2 px-4 py-3 sm:py-2 rounded-lg transition-all duration-300 min-h-[44px] flex-1 sm:flex-initial ${
                         isPlaying
-                          ? 'bg-red-600 hover:bg-red-700 text-white'
+                          ? 'bg-red-600 hover:bg-red-700 text-white animate-pulse'
                           : 'bg-blue-600 hover:bg-blue-700 text-white'
                       } hover:scale-105 shadow-lg touch-manipulation`}
                       title={isPlaying ? 'Stop' : 'Play'}
@@ -340,7 +377,7 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
                         <Play className="w-4 h-4" />
                       )}
                       <span className="text-sm font-medium whitespace-nowrap">
-                        {isPlaying ? 'Stop' : 'Play'}
+                        {isPlaying ? 'Playing...' : 'Play'}
                       </span>
                     </button>
                   </div>
@@ -348,13 +385,13 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
               )}
 
               {/* Mobile-specific audio status */}
-              {speechSupported && isPlaying && (
+              {isPlaying && (
                 <div className="sm:hidden bg-blue-900 bg-opacity-30 backdrop-blur-sm rounded-lg p-3 border border-blue-600">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
                       <span className="text-blue-300 text-sm">
-                        Playing audio...
+                        {speechSupported ? 'Playing audio...' : 'Audio feedback active...'}
                       </span>
                     </div>
                   </div>
