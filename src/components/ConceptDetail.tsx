@@ -122,60 +122,84 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
   const handleTextToSpeech = () => {
     if (!content) return;
 
-    // Stop any existing audio
-    if (audioElement) {
-      audioElement.pause();
-      audioElement.currentTime = 0;
-      setAudioElement(null);
-    }
-    
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
+    // Always cancel any existing speech first
+    window.speechSynthesis.cancel();
 
     if (isPlaying) {
       setIsPlaying(false);
       return;
     }
 
+    // Check if speech synthesis is supported
+    if (!('speechSynthesis' in window)) {
+      // Fallback beep if no speech synthesis
+      setIsPlaying(true);
+      tryAudioFallback('');
+      return;
+    }
+
     setIsPlaying(true);
 
-    // Try speech synthesis first
-    if ('speechSynthesis' in window) {
-      const cleanText = content
-        .replace(/#{1,6}\s/g, '')
-        .replace(/\n\s*\n/g, '. ')
-        .replace(/\n/g, ' ')
-        .trim();
+    // Clean the text for speech
+    const cleanText = content
+      .replace(/#{1,6}\s/g, '')
+      .replace(/\n\s*\n/g, '. ')
+      .replace(/\n/g, ' ')
+      .replace(/[^\w\s.,!?;:-]/g, '')
+      .trim();
 
-      const utterance = new SpeechSynthesisUtterance(cleanText);
-      utterance.rate = 0.8;
-      utterance.volume = 1;
-      
-      utterance.onend = () => {
-        setIsPlaying(false);
-      };
-      
-      utterance.onerror = () => {
-        setIsPlaying(false);
-        // Fallback to audio element approach
-        tryAudioFallback(cleanText);
-      };
+    // Limit text length for mobile performance
+    const textToSpeak = cleanText.length > 1000 ? cleanText.substring(0, 1000) + '...' : cleanText;
 
-      try {
+    // Create utterance
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    
+    // Mobile-optimized settings
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+    
+    // Force English language
+    utterance.lang = 'en-US';
+    
+    // Event handlers
+    utterance.onstart = () => {
+      setIsPlaying(true);
+    };
+    
+    utterance.onend = () => {
+      setIsPlaying(false);
+    };
+    
+    utterance.onerror = (event) => {
+      setIsPlaying(false);
+      // If speech fails, play beep as feedback
+      tryAudioFallback('');
+    };
+
+    // For mobile: ensure voices are loaded
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length === 0) {
+      // Wait for voices to load on mobile
+      window.speechSynthesis.onvoiceschanged = () => {
+        const availableVoices = window.speechSynthesis.getVoices();
+        const englishVoice = availableVoices.find(voice => 
+          voice.lang.startsWith('en') && !voice.name.includes('Google')
+        );
+        if (englishVoice) {
+          utterance.voice = englishVoice;
+        }
         window.speechSynthesis.speak(utterance);
-      } catch (error) {
-        setIsPlaying(false);
-        tryAudioFallback(cleanText);
-      }
+      };
     } else {
-      // Fallback for browsers without speech synthesis
-      const cleanText = content
-        .replace(/#{1,6}\s/g, '')
-        .replace(/\n\s*\n/g, '. ')
-        .replace(/\n/g, ' ')
-        .trim();
-      tryAudioFallback(cleanText);
+      // Voices already loaded
+      const englishVoice = voices.find(voice => 
+        voice.lang.startsWith('en') && !voice.name.includes('Google')
+      );
+      if (englishVoice) {
+        utterance.voice = englishVoice;
+      }
+      window.speechSynthesis.speak(utterance);
     }
   };
 
