@@ -19,11 +19,37 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
   const [isPaused, setIsPaused] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
   const [videoLoadError, setVideoLoadError] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const { content, loading, error } = useConceptDetail(concept.folder, concept.textFile);
 
   // Check if speech synthesis is supported
   React.useEffect(() => {
-    setSpeechSupported('speechSynthesis' in window);
+    const checkSpeechSupport = () => {
+      const supported = 'speechSynthesis' in window;
+      setSpeechSupported(supported);
+      
+      // Detect mobile devices
+      const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      setIsMobile(mobile);
+      
+      // On mobile, we need to ensure voices are loaded
+      if (supported && mobile) {
+        const loadVoices = () => {
+          const voices = window.speechSynthesis.getVoices();
+          if (voices.length === 0) {
+            // Voices not loaded yet, try again
+            setTimeout(loadVoices, 100);
+          }
+        };
+        
+        if (window.speechSynthesis.getVoices().length === 0) {
+          window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
+        }
+        loadVoices();
+      }
+    };
+    
+    checkSpeechSupport();
   }, []);
 
   // Reset video error state when image changes
@@ -119,7 +145,16 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
   const handleTextToSpeech = () => {
     if (!speechSupported || !content) return;
 
-    if (isPlaying && !isPaused) {
+    // On mobile, we need user interaction to start speech
+    if (isMobile && !isPlaying && !isPaused) {
+      // Cancel any existing speech first
+      window.speechSynthesis.cancel();
+      
+      // Small delay to ensure cancel is processed
+      setTimeout(() => {
+        startSpeech();
+      }, 100);
+    } else if (isPlaying && !isPaused) {
       // Pause speech
       window.speechSynthesis.pause();
       setIsPaused(true);
@@ -128,37 +163,68 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
       window.speechSynthesis.resume();
       setIsPaused(false);
     } else {
-      // Start new speech
-      window.speechSynthesis.cancel(); // Cancel any existing speech
-      
-      // Clean the text for better speech
-      const cleanText = content
-        .replace(/#{1,6}\s/g, '') // Remove markdown headers
-        .replace(/\n\s*\n/g, '. ') // Replace double line breaks with periods
-        .replace(/\n/g, ' ') // Replace single line breaks with spaces
-        .trim();
+      startSpeech();
+    }
+  };
 
-      const utterance = new SpeechSynthesisUtterance(cleanText);
+  const startSpeech = () => {
+    // Clean the text for better speech
+    const cleanText = content
+      .replace(/#{1,6}\s/g, '') // Remove markdown headers
+      .replace(/\n\s*\n/g, '. ') // Replace double line breaks with periods
+      .replace(/\n/g, ' ') // Replace single line breaks with spaces
+      .trim();
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    
+    // Mobile-optimized settings
+    if (isMobile) {
+      utterance.rate = 0.8; // Slightly slower for mobile
+      utterance.pitch = 1;
+      utterance.volume = 1; // Full volume on mobile
+      
+      // Try to use a specific voice if available
+      const voices = window.speechSynthesis.getVoices();
+      const englishVoice = voices.find(voice => voice.lang.startsWith('en'));
+      if (englishVoice) {
+        utterance.voice = englishVoice;
+      }
+    } else {
       utterance.rate = 0.9;
       utterance.pitch = 1;
       utterance.volume = 0.8;
+    }
 
-      utterance.onstart = () => {
-        setIsPlaying(true);
-        setIsPaused(false);
-      };
+    utterance.onstart = () => {
+      setIsPlaying(true);
+      setIsPaused(false);
+    };
 
-      utterance.onend = () => {
-        setIsPlaying(false);
-        setIsPaused(false);
-      };
+    utterance.onend = () => {
+      setIsPlaying(false);
+      setIsPaused(false);
+    };
 
-      utterance.onerror = () => {
-        setIsPlaying(false);
-        setIsPaused(false);
-      };
+    utterance.onerror = (event) => {
+      console.error('Speech synthesis error:', event.error);
+      setIsPlaying(false);
+      setIsPaused(false);
+    };
 
+    utterance.onpause = () => {
+      setIsPaused(true);
+    };
+
+    utterance.onresume = () => {
+      setIsPaused(false);
+    };
+
+    try {
       window.speechSynthesis.speak(utterance);
+    } catch (error) {
+      console.error('Failed to start speech:', error);
+      setIsPlaying(false);
+      setIsPaused(false);
     }
   };
 
@@ -208,162 +274,178 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
   return (
     <>
       <div className="min-h-screen bg-black text-white">
-      <div className="container mx-auto px-6 py-8">
-        <button
-          onClick={onBack}
-          className="flex items-center space-x-2 text-gray-400 hover:text-white transition-colors duration-300 mb-8 group"
-        >
-          <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform duration-300" />
-          <span>Back to Gallery</span>
-        </button>
+        <div className="container mx-auto px-6 py-8">
+          <button
+            onClick={onBack}
+            className="flex items-center space-x-2 text-gray-400 hover:text-white transition-colors duration-300 mb-8 group"
+          >
+            <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform duration-300" />
+            <span>Back to Gallery</span>
+          </button>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 max-w-7xl mx-auto">
-          {/* Image Section */}
-          <div className="space-y-6">
-            {availableImages.length > 0 && (
-            <div className="relative aspect-video bg-gray-900 rounded-2xl overflow-hidden shadow-2xl">
-              {/* Check if current image is animated */}
-              {availableImages[currentImageIndex]?.match(/\.(avifs|webm|apng|gif)$/i) && !videoLoadError ? (
-                <video
-                  onClick={openFullscreen}
-                  src={`/${concept.folder}/${availableImages[currentImageIndex]}`}
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  className="w-full h-full object-contain cursor-pointer hover:opacity-90 transition-opacity"
-                  onError={(e) => {
-                    setVideoLoadError(true);
-                  }}
-                />
-              ) : (
-              <img
-                onClick={openFullscreen}
-                  src={`/${concept.folder}/${availableImages[currentImageIndex]}`}
-                alt={`${concept.title} - Image ${currentImageIndex + 1}`}
-                className="w-full h-full object-contain cursor-pointer hover:opacity-90 transition-opacity"
-              />
-              )}
-              
-                {availableImages.length > 1 && (
-                <>
-                  <button
-                    onClick={prevImage}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white p-2 rounded-full transition-all duration-300 hover:scale-110"
-                  >
-                    <ChevronLeft className="w-6 h-6" />
-                  </button>
-                  <button
-                    onClick={nextImage}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white p-2 rounded-full transition-all duration-300 hover:scale-110"
-                  >
-                    <ChevronRight className="w-6 h-6" />
-                  </button>
-                </>
-              )}
-            </div>
-            )}
-
-            {/* Thumbnail Navigation */}
-            {availableImages.length > 1 && (
-              <div className="flex space-x-3 justify-center">
-                {availableImages.map((image, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setCurrentImageIndex(index)}
-                    className={`w-16 h-16 rounded-lg overflow-hidden transition-all duration-300 border-2 ${
-                      currentImageIndex === index
-                        ? 'border-blue-400 scale-105'
-                        : 'border-gray-600 hover:border-gray-400 hover:scale-105'
-                    }`}
-                  >
-                    <img
-                      src={`/${concept.folder}/${image}`}
-                      alt={`Thumbnail ${index + 1}`}
-                      className="w-full h-full object-contain bg-gray-800"
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 max-w-7xl mx-auto">
+            {/* Image Section */}
+            <div className="space-y-6">
+              {availableImages.length > 0 && (
+                <div className="relative aspect-video bg-gray-900 rounded-2xl overflow-hidden shadow-2xl">
+                  {/* Check if current image is animated */}
+                  {availableImages[currentImageIndex]?.match(/\.(avifs|webm|apng|gif)$/i) && !videoLoadError ? (
+                    <video
+                      onClick={openFullscreen}
+                      src={`/${concept.folder}/${availableImages[currentImageIndex]}`}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="w-full h-full object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                      onError={(e) => {
+                        setVideoLoadError(true);
+                      }}
                     />
-                  </button>
-                ))}
-              </div>
-            )}
-            
-            {/* Image Counter */}
-            {availableImages.length > 1 && (
-              <div className="text-center">
-                <span className="text-gray-400 text-sm">
-                  {currentImageIndex + 1} of {availableImages.length}
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Content Section */}
-          <div className="space-y-6">
-            {/* Audio Controls */}
-            {speechSupported && content && !loading && !error && (
-              <div className="flex items-center justify-between bg-gray-900 bg-opacity-50 backdrop-blur-sm rounded-xl p-4 border border-gray-700">
-                <div className="flex items-center space-x-3">
-                  <Volume2 className="w-5 h-5 text-blue-400" />
-                  <span className="text-gray-300 font-medium">Listen to this concept</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={handleTextToSpeech}
-                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-300 ${
-                      isPlaying && !isPaused
-                        ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
-                        : isPaused
-                        ? 'bg-green-600 hover:bg-green-700 text-white'
-                        : 'bg-blue-600 hover:bg-blue-700 text-white'
-                    } hover:scale-105 shadow-lg`}
-                    title={isPlaying && !isPaused ? 'Pause' : isPaused ? 'Resume' : 'Play'}
-                  >
-                    {isPlaying && !isPaused ? (
-                      <Pause className="w-4 h-4" />
-                    ) : isPaused ? (
-                      <Play className="w-4 h-4" />
-                    ) : (
-                      <Play className="w-4 h-4" />
-                    )}
-                    <span className="text-sm font-medium">
-                      {isPlaying && !isPaused ? 'Pause' : isPaused ? 'Resume' : 'Play'}
-                    </span>
-                  </button>
-                  {isPlaying && (
-                    <button
-                      onClick={stopTextToSpeech}
-                      className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white transition-all duration-300 hover:scale-105 shadow-lg"
-                      title="Stop"
-                    >
-                      <VolumeX className="w-4 h-4" />
-                      <span className="text-sm font-medium">Stop</span>
-                    </button>
+                  ) : (
+                    <img
+                      onClick={openFullscreen}
+                      src={`/${concept.folder}/${availableImages[currentImageIndex]}`}
+                      alt={`${concept.title} - Image ${currentImageIndex + 1}`}
+                      className="w-full h-full object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                    />
+                  )}
+                  
+                  {availableImages.length > 1 && (
+                    <>
+                      <button
+                        onClick={prevImage}
+                        className="absolute left-4 top-1/2 -translate-y-1/2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white p-2 rounded-full transition-all duration-300 hover:scale-110"
+                      >
+                        <ChevronLeft className="w-6 h-6" />
+                      </button>
+                      <button
+                        onClick={nextImage}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white p-2 rounded-full transition-all duration-300 hover:scale-110"
+                      >
+                        <ChevronRight className="w-6 h-6" />
+                      </button>
+                    </>
                   )}
                 </div>
-              </div>
-            )}
+              )}
 
-            {loading && (
-              <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-blue-400"></div>
-              </div>
-            )}
-            
-            {error && (
-              <div className="bg-red-900 bg-opacity-20 border border-red-600 rounded-lg p-4">
-                <p className="text-red-400">Error loading concept details: {error}</p>
-              </div>
-            )}
-            
-            {!loading && !error && content && (
-              <div className="prose prose-invert max-w-none">
-                {formatContent(content)}
-              </div>
-            )}
+              {/* Thumbnail Navigation */}
+              {availableImages.length > 1 && (
+                <div className="flex space-x-3 justify-center">
+                  {availableImages.map((image, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setCurrentImageIndex(index)}
+                      className={`w-16 h-16 rounded-lg overflow-hidden transition-all duration-300 border-2 ${
+                        currentImageIndex === index
+                          ? 'border-blue-400 scale-105'
+                          : 'border-gray-600 hover:border-gray-400 hover:scale-105'
+                      }`}
+                    >
+                      <img
+                        src={`/${concept.folder}/${image}`}
+                        alt={`Thumbnail ${index + 1}`}
+                        className="w-full h-full object-contain bg-gray-800"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+              
+              {/* Image Counter */}
+              {availableImages.length > 1 && (
+                <div className="text-center">
+                  <span className="text-gray-400 text-sm">
+                    {currentImageIndex + 1} of {availableImages.length}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Content Section */}
+            <div className="space-y-6">
+              {/* Audio Controls */}
+              {speechSupported && content && !loading && !error && (
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-gray-900 bg-opacity-50 backdrop-blur-sm rounded-xl p-4 border border-gray-700 space-y-3 sm:space-y-0">
+                  <div className="flex items-center space-x-3">
+                    <Volume2 className="w-5 h-5 text-blue-400" />
+                    <span className="text-gray-300 font-medium text-sm sm:text-base">
+                      Listen to this concept {isMobile ? '(Mobile)' : ''}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2 w-full sm:w-auto">
+                    <button
+                      onClick={handleTextToSpeech}
+                      className={`flex items-center justify-center space-x-2 px-4 py-3 sm:py-2 rounded-lg transition-all duration-300 min-h-[44px] flex-1 sm:flex-initial ${
+                        isPlaying && !isPaused
+                          ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
+                          : isPaused
+                          ? 'bg-green-600 hover:bg-green-700 text-white'
+                          : 'bg-blue-600 hover:bg-blue-700 text-white'
+                      } hover:scale-105 shadow-lg touch-manipulation`}
+                      title={isPlaying && !isPaused ? 'Pause' : isPaused ? 'Resume' : 'Play'}
+                    >
+                      {isPlaying && !isPaused ? (
+                        <Pause className="w-4 h-4" />
+                      ) : isPaused ? (
+                        <Play className="w-4 h-4" />
+                      ) : (
+                        <Play className="w-4 h-4" />
+                      )}
+                      <span className="text-sm font-medium whitespace-nowrap">
+                        {isPlaying && !isPaused ? 'Pause' : isPaused ? 'Resume' : 'Play'}
+                      </span>
+                    </button>
+                    {isPlaying && (
+                      <button
+                        onClick={stopTextToSpeech}
+                        className="flex items-center justify-center space-x-2 px-3 py-3 sm:py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white transition-all duration-300 hover:scale-105 shadow-lg min-h-[44px] touch-manipulation"
+                        title="Stop"
+                      >
+                        <VolumeX className="w-4 h-4" />
+                        <span className="text-sm font-medium">Stop</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Mobile-specific audio status */}
+              {speechSupported && (isPlaying || isPaused) && (
+                <div className="sm:hidden bg-blue-900 bg-opacity-30 backdrop-blur-sm rounded-lg p-3 border border-blue-600">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className={`w-2 h-2 rounded-full ${isPlaying && !isPaused ? 'bg-yellow-400 animate-pulse' : 'bg-gray-400'}`}></div>
+                      <span className="text-blue-300 text-sm">
+                        {isPlaying && !isPaused ? 'Playing audio...' : isPaused ? 'Audio paused' : 'Audio stopped'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {loading && (
+                <div className="flex items-center justify-center h-64">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-blue-400"></div>
+                </div>
+              )}
+              
+              {error && (
+                <div className="bg-red-900 bg-opacity-20 border border-red-600 rounded-lg p-4">
+                  <p className="text-red-400">Error loading concept details: {error}</p>
+                </div>
+              )}
+              
+              {!loading && !error && content && (
+                <div className="prose prose-invert max-w-none">
+                  {formatContent(content)}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
       {/* Fullscreen Modal */}
       {isFullscreen && (
@@ -401,7 +483,7 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
                 ></div>
               </div>
               <span className="text-white text-sm min-w-[60px] text-center font-mono bg-gray-800 px-2 py-1 rounded">
-              {Math.round(zoom * 100)}%
+                {Math.round(zoom * 100)}%
               </span>
             </div>
             
@@ -475,7 +557,7 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
                   ))}
                 </div>
                 <span className="text-white text-sm font-medium">
-                {currentImageIndex + 1} of {availableImages.length}
+                  {currentImageIndex + 1} of {availableImages.length}
                 </span>
               </div>
             </div>
@@ -518,18 +600,18 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
                 }}
               />
             ) : (
-            <img
-              src={`/${concept.folder}/${availableImages[currentImageIndex]}`}
-              alt={`${concept.title} - Image ${currentImageIndex + 1}`}
-              className="max-w-full max-h-full object-contain transition-all duration-500 ease-out drop-shadow-2xl"
-              style={{
-                transform: `scale(${zoom}) rotate(${rotation}deg)`,
-                filter: 'drop-shadow(0 25px 50px rgba(0, 0, 0, 0.5))',
-              }}
-              onLoad={() => {
-                // Image loaded successfully
-              }}
-            />
+              <img
+                src={`/${concept.folder}/${availableImages[currentImageIndex]}`}
+                alt={`${concept.title} - Image ${currentImageIndex + 1}`}
+                className="max-w-full max-h-full object-contain transition-all duration-500 ease-out drop-shadow-2xl"
+                style={{
+                  transform: `scale(${zoom}) rotate(${rotation}deg)`,
+                  filter: 'drop-shadow(0 25px 50px rgba(0, 0, 0, 0.5))',
+                }}
+                onLoad={() => {
+                  // Image loaded successfully
+                }}
+              />
             )}
           </div>
           
