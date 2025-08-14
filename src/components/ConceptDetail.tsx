@@ -154,15 +154,15 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
       window.speechSynthesis.resume();
       setIsPaused(false);
     } else {
-      // Cancel any existing speech first
-      window.speechSynthesis.cancel();
-      
-      // Start new speech
-      startSpeech();
+      // Start new speech - mobile needs immediate execution
+      startSpeechImmediate();
     }
   };
 
-  const startSpeech = () => {
+  const startSpeechImmediate = () => {
+    // Cancel any existing speech
+    window.speechSynthesis.cancel();
+    
     // Clean the text for better speech
     const cleanText = content
       .replace(/#{1,6}\s/g, '') // Remove markdown headers
@@ -172,19 +172,18 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
 
     const utterance = new SpeechSynthesisUtterance(cleanText);
     
-    // Configure speech settings
-    utterance.rate = isMobile ? 0.8 : 0.9;
+    // Configure speech settings - simpler for mobile
+    utterance.rate = 0.8;
     utterance.pitch = 1;
     utterance.volume = 1;
     
-    // Try to use an English voice
-    const voices = window.speechSynthesis.getVoices();
-    const englishVoice = voices.find(voice => 
-      voice.lang.startsWith('en') && !voice.name.includes('Google')
-    ) || voices.find(voice => voice.lang.startsWith('en'));
-    
-    if (englishVoice) {
-      utterance.voice = englishVoice;
+    // For mobile, don't set specific voice - use default
+    if (!isMobile) {
+      const voices = window.speechSynthesis.getVoices();
+      const englishVoice = voices.find(voice => voice.lang.startsWith('en'));
+      if (englishVoice) {
+        utterance.voice = englishVoice;
+      }
     }
 
     utterance.onstart = () => {
@@ -210,25 +209,8 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
       setIsPaused(false);
     };
 
-    // For mobile, we need to ensure this happens immediately after user interaction
-    if (isMobile) {
-      // Create a small audio context to unlock audio on mobile
-      try {
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        if (audioContext.state === 'suspended') {
-          audioContext.resume().then(() => {
-            window.speechSynthesis.speak(utterance);
-          });
-        } else {
-          window.speechSynthesis.speak(utterance);
-        }
-      } catch (error) {
-        // Fallback if AudioContext fails
-        window.speechSynthesis.speak(utterance);
-      }
-    } else {
-      window.speechSynthesis.speak(utterance);
-    }
+    // Speak immediately - this must happen synchronously with user interaction on mobile
+    window.speechSynthesis.speak(utterance);
   };
 
   const stopTextToSpeech = () => {
