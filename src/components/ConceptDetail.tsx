@@ -168,6 +168,10 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
   };
 
   const startSpeech = () => {
+    console.log('Starting speech synthesis...');
+    console.log('Mobile detected:', isMobile);
+    console.log('Available voices:', window.speechSynthesis.getVoices().length);
+    
     // Clean the text for better speech
     const cleanText = content
       .replace(/#{1,6}\s/g, '') // Remove markdown headers
@@ -175,60 +179,78 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
       .replace(/\n/g, ' ') // Replace single line breaks with spaces
       .trim();
 
-    const utterance = new SpeechSynthesisUtterance(cleanText);
+    console.log('Text length:', cleanText.length);
     
-    // Mobile-optimized settings
-    if (isMobile) {
-      utterance.rate = 0.8; // Slightly slower for mobile
-      utterance.pitch = 1;
-      utterance.volume = 1; // Full volume on mobile
+    // Cancel any existing speech first
+    window.speechSynthesis.cancel();
+    
+    // Wait a moment for cancel to complete
+    setTimeout(() => {
+      console.log('Creating utterance...');
+      const utterance = new SpeechSynthesisUtterance(cleanText);
       
-      // Try to use a specific voice if available
-      const voices = window.speechSynthesis.getVoices();
-      const englishVoice = voices.find(voice => voice.lang.startsWith('en'));
-      if (englishVoice) {
-        utterance.voice = englishVoice;
+      // Mobile-optimized settings
+      if (isMobile) {
+        utterance.rate = 0.8; // Slightly slower for mobile
+        utterance.pitch = 1;
+        utterance.volume = 1; // Full volume on mobile
+        
+        // Try to use a specific voice if available
+        const voices = window.speechSynthesis.getVoices();
+        console.log('Voices available:', voices.map(v => v.name));
+        const englishVoice = voices.find(voice => voice.lang.startsWith('en'));
+        if (englishVoice) {
+          utterance.voice = englishVoice;
+          console.log('Selected voice:', englishVoice.name);
+        }
+      } else {
+        utterance.rate = 0.9;
+        utterance.pitch = 1;
+        utterance.volume = 0.8;
       }
-    } else {
-      utterance.rate = 0.9;
-      utterance.pitch = 1;
-      utterance.volume = 0.8;
-    }
 
-    utterance.onstart = () => {
-      setIsPlaying(true);
-      setIsPaused(false);
-    };
+      utterance.onstart = () => {
+        console.log('Speech started');
+        setIsPlaying(true);
+        setIsPaused(false);
+      };
 
-    utterance.onend = () => {
-      setIsPlaying(false);
-      setIsPaused(false);
-    };
+      utterance.onend = () => {
+        console.log('Speech ended');
+        setIsPlaying(false);
+        setIsPaused(false);
+      };
 
-    utterance.onerror = (event) => {
-      console.error('Speech synthesis error:', event.error);
-      setIsPlaying(false);
-      setIsPaused(false);
-    };
+      utterance.onerror = (event) => {
+        console.error('Speech synthesis error:', event.error);
+        console.error('Error details:', event);
+        setIsPlaying(false);
+        setIsPaused(false);
+      };
 
-    utterance.onpause = () => {
-      setIsPaused(true);
-    };
+      utterance.onpause = () => {
+        console.log('Speech paused');
+        setIsPaused(true);
+      };
 
-    utterance.onresume = () => {
-      setIsPaused(false);
-    };
+      utterance.onresume = () => {
+        console.log('Speech resumed');
+        setIsPaused(false);
+      };
 
-    try {
-      window.speechSynthesis.speak(utterance);
-    } catch (error) {
-      console.error('Failed to start speech:', error);
-      setIsPlaying(false);
-      setIsPaused(false);
-    }
+      try {
+        console.log('Attempting to speak...');
+        window.speechSynthesis.speak(utterance);
+      } catch (error) {
+        console.error('Failed to start speech:', error);
+        setIsPlaying(false);
+        setIsPaused(false);
+      }
+    }, 100);
   };
 
   const stopTextToSpeech = () => {
+    console.log('Stopping speech');
     window.speechSynthesis.cancel();
     setIsPlaying(false);
     setIsPaused(false);
