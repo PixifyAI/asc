@@ -453,7 +453,7 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
           {/* Close Button */}
           <button
             onClick={closeFullscreen}
-            className="absolute top-6 right-6 text-white hover:text-red-400 transition-all duration-300 p-3 rounded-full hover:bg-red-500 hover:bg-opacity-20 hover:scale-110 backdrop-blur-md bg-black bg-opacity-30 border border-gray-600 hover:border-red-400 z-[10000] group"
+            className="absolute top-16 right-6 text-white hover:text-red-400 transition-all duration-300 p-3 rounded-full hover:bg-red-500 hover:bg-opacity-20 hover:scale-110 backdrop-blur-md bg-black bg-opacity-30 border border-gray-600 hover:border-red-400 z-[10000] group"
             title="Close"
           >
             <X className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" />
