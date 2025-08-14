@@ -145,16 +145,7 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
   const handleTextToSpeech = () => {
     if (!speechSupported || !content) return;
 
-    // On mobile, we need user interaction to start speech
-    if (isMobile && !isPlaying && !isPaused) {
-      // Cancel any existing speech first
-      window.speechSynthesis.cancel();
-      
-      // Small delay to ensure cancel is processed
-      setTimeout(() => {
-        startSpeech();
-      }, 100);
-    } else if (isPlaying && !isPaused) {
+    if (isPlaying && !isPaused) {
       // Pause speech
       window.speechSynthesis.pause();
       setIsPaused(true);
@@ -163,15 +154,15 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
       window.speechSynthesis.resume();
       setIsPaused(false);
     } else {
+      // Cancel any existing speech first
+      window.speechSynthesis.cancel();
+      
+      // Start new speech
       startSpeech();
     }
   };
 
   const startSpeech = () => {
-    console.log('Starting speech synthesis...');
-    console.log('Mobile detected:', isMobile);
-    console.log('Available voices:', window.speechSynthesis.getVoices().length);
-    
     // Clean the text for better speech
     const cleanText = content
       .replace(/#{1,6}\s/g, '') // Remove markdown headers
@@ -179,78 +170,68 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
       .replace(/\n/g, ' ') // Replace single line breaks with spaces
       .trim();
 
-    console.log('Text length:', cleanText.length);
+    const utterance = new SpeechSynthesisUtterance(cleanText);
     
-    // Cancel any existing speech first
-    window.speechSynthesis.cancel();
+    // Configure speech settings
+    utterance.rate = isMobile ? 0.8 : 0.9;
+    utterance.pitch = 1;
+    utterance.volume = 1;
     
-    // Wait a moment for cancel to complete
-    setTimeout(() => {
-      console.log('Creating utterance...');
-      const utterance = new SpeechSynthesisUtterance(cleanText);
-      
-      // Mobile-optimized settings
-      if (isMobile) {
-        utterance.rate = 0.8; // Slightly slower for mobile
-        utterance.pitch = 1;
-        utterance.volume = 1; // Full volume on mobile
-        
-        // Try to use a specific voice if available
-        const voices = window.speechSynthesis.getVoices();
-        console.log('Voices available:', voices.map(v => v.name));
-        const englishVoice = voices.find(voice => voice.lang.startsWith('en'));
-        if (englishVoice) {
-          utterance.voice = englishVoice;
-          console.log('Selected voice:', englishVoice.name);
-        }
-      } else {
-        utterance.rate = 0.9;
-        utterance.pitch = 1;
-        utterance.volume = 0.8;
-      }
+    // Try to use an English voice
+    const voices = window.speechSynthesis.getVoices();
+    const englishVoice = voices.find(voice => 
+      voice.lang.startsWith('en') && !voice.name.includes('Google')
+    ) || voices.find(voice => voice.lang.startsWith('en'));
+    
+    if (englishVoice) {
+      utterance.voice = englishVoice;
+    }
 
-      utterance.onstart = () => {
-        console.log('Speech started');
-        setIsPlaying(true);
-        setIsPaused(false);
-      };
+    utterance.onstart = () => {
+      setIsPlaying(true);
+      setIsPaused(false);
+    };
 
-      utterance.onend = () => {
-        console.log('Speech ended');
-        setIsPlaying(false);
-        setIsPaused(false);
-      };
+    utterance.onend = () => {
+      setIsPlaying(false);
+      setIsPaused(false);
+    };
 
-      utterance.onerror = (event) => {
-        console.error('Speech synthesis error:', event.error);
-        console.error('Error details:', event);
-        setIsPlaying(false);
-        setIsPaused(false);
-      };
+    utterance.onerror = () => {
+      setIsPlaying(false);
+      setIsPaused(false);
+    };
 
-      utterance.onpause = () => {
-        console.log('Speech paused');
-        setIsPaused(true);
-      };
+    utterance.onpause = () => {
+      setIsPaused(true);
+    };
 
-      utterance.onresume = () => {
-        console.log('Speech resumed');
-        setIsPaused(false);
-      };
+    utterance.onresume = () => {
+      setIsPaused(false);
+    };
 
+    // For mobile, we need to ensure this happens immediately after user interaction
+    if (isMobile) {
+      // Create a small audio context to unlock audio on mobile
       try {
-        console.log('Attempting to speak...');
-        window.speechSynthesis.speak(utterance);
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioContext.state === 'suspended') {
+          audioContext.resume().then(() => {
+            window.speechSynthesis.speak(utterance);
+          });
+        } else {
+          window.speechSynthesis.speak(utterance);
+        }
       } catch (error) {
-        console.error('Failed to start speech:', error);
-        setIsPlaying(false);
-        setIsPaused(false);
+        // Fallback if AudioContext fails
+        window.speechSynthesis.speak(utterance);
       }
-    }, 100);
+    } else {
+      window.speechSynthesis.speak(utterance);
+    }
   };
 
   const stopTextToSpeech = () => {
-    console.log('Stopping speech');
     window.speechSynthesis.cancel();
     setIsPlaying(false);
     setIsPaused(false);
