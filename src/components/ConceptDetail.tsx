@@ -20,36 +20,17 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
   const [speechSupported, setSpeechSupported] = useState(false);
   const [videoLoadError, setVideoLoadError] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [speechUtterance, setSpeechUtterance] = useState<SpeechSynthesisUtterance | null>(null);
   const { content, loading, error } = useConceptDetail(concept.folder, concept.textFile);
 
   // Check if speech synthesis is supported
   React.useEffect(() => {
-    const checkSpeechSupport = () => {
-      const supported = 'speechSynthesis' in window;
-      setSpeechSupported(supported);
-      
-      // Detect mobile devices
-      const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      setIsMobile(mobile);
-      
-      // On mobile, we need to ensure voices are loaded
-      if (supported && mobile) {
-        const loadVoices = () => {
-          const voices = window.speechSynthesis.getVoices();
-          if (voices.length === 0) {
-            // Voices not loaded yet, try again
-            setTimeout(loadVoices, 100);
-          }
-        };
-        
-        if (window.speechSynthesis.getVoices().length === 0) {
-          window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
-        }
-        loadVoices();
-      }
-    };
+    const supported = 'speechSynthesis' in window;
+    setSpeechSupported(supported);
     
-    checkSpeechSupport();
+    // Detect mobile devices
+    const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    setIsMobile(mobile);
   }, []);
 
   // Reset video error state when image changes
@@ -143,26 +124,22 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
   };
 
   const handleTextToSpeech = () => {
-    if (!speechSupported || !content) return;
-
-    if (isPlaying && !isPaused) {
-      // Pause speech
-      window.speechSynthesis.pause();
-      setIsPaused(true);
-    } else if (isPaused) {
-      // Resume speech
-      window.speechSynthesis.resume();
-      setIsPaused(false);
-    } else {
-      // Start new speech - mobile needs immediate execution
-      startSpeechImmediate();
+    if (!speechSupported || !content) {
+      console.log('Speech not supported or no content');
+      return;
     }
-  };
 
-  const startSpeechImmediate = () => {
-    // Cancel any existing speech
+    // Stop any existing speech first
     window.speechSynthesis.cancel();
     
+    if (isPlaying) {
+      // Stop speech
+      setIsPlaying(false);
+      setIsPaused(false);
+      setSpeechUtterance(null);
+      return;
+    }
+
     // Clean the text for better speech
     const cleanText = content
       .replace(/#{1,6}\s/g, '') // Remove markdown headers
@@ -178,13 +155,6 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
     utterance.volume = 1;
     
     // For mobile, don't set specific voice - use default
-    if (!isMobile) {
-      const voices = window.speechSynthesis.getVoices();
-      const englishVoice = voices.find(voice => voice.lang.startsWith('en'));
-      if (englishVoice) {
-        utterance.voice = englishVoice;
-      }
-    }
 
     utterance.onstart = () => {
       setIsPlaying(true);
@@ -194,6 +164,7 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
     utterance.onend = () => {
       setIsPlaying(false);
       setIsPaused(false);
+      setSpeechUtterance(null);
     };
 
     utterance.onerror = () => {
@@ -201,15 +172,8 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
       setIsPaused(false);
     };
 
-    utterance.onpause = () => {
-      setIsPaused(true);
-    };
-
-    utterance.onresume = () => {
-      setIsPaused(false);
-    };
-
-    // Speak immediately - this must happen synchronously with user interaction on mobile
+    // Store the utterance and speak immediately
+    setSpeechUtterance(utterance);
     window.speechSynthesis.speak(utterance);
   };
 
@@ -217,6 +181,7 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
     window.speechSynthesis.cancel();
     setIsPlaying(false);
     setIsPaused(false);
+    setSpeechUtterance(null);
   };
 
   const formatContent = (text: string) => {
@@ -356,54 +321,40 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ concept, onBack })
                   <div className="flex items-center space-x-3">
                     <Volume2 className="w-5 h-5 text-blue-400" />
                     <span className="text-gray-300 font-medium text-sm sm:text-base">
-                      Listen to this concept {isMobile ? '(Mobile)' : ''}
+                      Listen to this concept
                     </span>
                   </div>
                   <div className="flex items-center space-x-2 w-full sm:w-auto">
                     <button
                       onClick={handleTextToSpeech}
                       className={`flex items-center justify-center space-x-2 px-4 py-3 sm:py-2 rounded-lg transition-all duration-300 min-h-[44px] flex-1 sm:flex-initial ${
-                        isPlaying && !isPaused
-                          ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
-                          : isPaused
-                          ? 'bg-green-600 hover:bg-green-700 text-white'
+                        isPlaying
+                          ? 'bg-red-600 hover:bg-red-700 text-white'
                           : 'bg-blue-600 hover:bg-blue-700 text-white'
                       } hover:scale-105 shadow-lg touch-manipulation`}
-                      title={isPlaying && !isPaused ? 'Pause' : isPaused ? 'Resume' : 'Play'}
+                      title={isPlaying ? 'Stop' : 'Play'}
                     >
-                      {isPlaying && !isPaused ? (
-                        <Pause className="w-4 h-4" />
-                      ) : isPaused ? (
-                        <Play className="w-4 h-4" />
+                      {isPlaying ? (
+                        <VolumeX className="w-4 h-4" />
                       ) : (
                         <Play className="w-4 h-4" />
                       )}
                       <span className="text-sm font-medium whitespace-nowrap">
-                        {isPlaying && !isPaused ? 'Pause' : isPaused ? 'Resume' : 'Play'}
+                        {isPlaying ? 'Stop' : 'Play'}
                       </span>
                     </button>
-                    {isPlaying && (
-                      <button
-                        onClick={stopTextToSpeech}
-                        className="flex items-center justify-center space-x-2 px-3 py-3 sm:py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white transition-all duration-300 hover:scale-105 shadow-lg min-h-[44px] touch-manipulation"
-                        title="Stop"
-                      >
-                        <VolumeX className="w-4 h-4" />
-                        <span className="text-sm font-medium">Stop</span>
-                      </button>
-                    )}
                   </div>
                 </div>
               )}
 
               {/* Mobile-specific audio status */}
-              {speechSupported && (isPlaying || isPaused) && (
+              {speechSupported && isPlaying && (
                 <div className="sm:hidden bg-blue-900 bg-opacity-30 backdrop-blur-sm rounded-lg p-3 border border-blue-600">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <div className={`w-2 h-2 rounded-full ${isPlaying && !isPaused ? 'bg-yellow-400 animate-pulse' : 'bg-gray-400'}`}></div>
+                      <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
                       <span className="text-blue-300 text-sm">
-                        {isPlaying && !isPaused ? 'Playing audio...' : isPaused ? 'Audio paused' : 'Audio stopped'}
+                        Playing audio...
                       </span>
                     </div>
                   </div>
