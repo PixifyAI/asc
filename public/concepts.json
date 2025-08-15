@@ -29,6 +29,13 @@
       "textFile": "Dark_Platoon.txt"
     },
     {
+      "id": "neon-oni",
+      "title": "Neon Oni",
+      "folder": "Neon Oni",
+      "mainImage": "Neon_Oni.png",
+      "textFile": "Neon_Oni.txt"
+    },
+    {
       "id": "null-state",
       "title": "Null State",
       "folder": "Null State",
@@ -43,11 +50,25 @@
       "textFile": "Patch_Notes.txt"
     },
     {
-      "id": "redemption-in-rot-flesh-an-flintlock",
-      "title": "Redemption in Rot Flesh an Flintlock",
-      "folder": "Redemption in Rot Flesh an Flintlock",
-      "mainImage": "Redemption_in_Rot_Flesh_an_Flintlock.png",
-      "textFile": "Redemption_in_Rot_Flesh_an_Flintlock.txt"
+      "id": "plata-o-sangre",
+      "title": "Plata o Sangre",
+      "folder": "Plata o Sangre",
+      "mainImage": "Plata_o_Sangre.png",
+      "textFile": "Plata_o_Sangre.txt"
+    },
+    {
+      "id": "projekt-absurditat",
+      "title": "Projekt Absurditat",
+      "folder": "Projekt Absurditat",
+      "mainImage": "Projekt_Absurditat.png",
+      "textFile": "Projekt_Absurditat.txt"
+    },
+    {
+      "id": "redemption-in-rot-flesh-and-flintlock",
+      "title": "Redemption in Rot Flesh & Flintlock",
+      "folder": "Redemption in Rot Flesh & Flintlock",
+      "mainImage": "Redemption_in_Rot_Flesh_&_Flintlock.png",
+      "textFile": "Redemption_in_Rot_Flesh_&_Flintlock.txt"
     },
     {
       "id": "star-crossed-salvagers",
@@ -64,11 +85,18 @@
       "textFile": "Task_Force_ODIN.txt"
     },
     {
-      "id": "projekt-absurditat",
-      "title": "Projekt Absurditat",
-      "folder": "Projekt Absurditat",
-      "mainImage": "Projekt_Absurditat.png",
-      "textFile": "Projekt_Absurditat.txt"
+      "id": "the-rust-testament",
+      "title": "The Rust Testament",
+      "folder": "The Rust Testament",
+      "mainImage": "The_Rust_Testament.png",
+      "textFile": "The_Rust_Testament.txt"
+    },
+    {
+      "id": "the-void-churn",
+      "title": "The Void Churn",
+      "folder": "The Void Churn",
+      "mainImage": "The_Void_Churn.png",
+      "textFile": "The_Void_Churn.txt"
     }
   ]
 }
