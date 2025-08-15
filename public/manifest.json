@@ -1,0 +1,74 @@
+{
+  "concepts": [
+    {
+      "id": "afterlife-inc",
+      "title": "Afterlife, Inc",
+      "folder": "Afterlife, Inc",
+      "mainImage": "Afterlife_Inc.png",
+      "textFile": "Afterlife_Inc.txt"
+    },
+    {
+      "id": "bob",
+      "title": "BOB",
+      "folder": "BOB",
+      "mainImage": "BOB.png",
+      "textFile": "BOB.txt"
+    },
+    {
+      "id": "cosmic-glitch",
+      "title": "Cosmic Glitch",
+      "folder": "Cosmic Glitch",
+      "mainImage": "Cosmic_Glitch.png",
+      "textFile": "Cosmic_Glitch.txt"
+    },
+    {
+      "id": "dark-platoon",
+      "title": "Dark Platoon",
+      "folder": "Dark Platoon",
+      "mainImage": "Dark_Platoon.png",
+      "textFile": "Dark_Platoon.txt"
+    },
+    {
+      "id": "null-state",
+      "title": "Null State",
+      "folder": "Null State",
+      "mainImage": "Null_State.png",
+      "textFile": "Null_State.txt"
+    },
+    {
+      "id": "patch-notes",
+      "title": "Patch Notes",
+      "folder": "Patch Notes",
+      "mainImage": "Patch_Notes.png",
+      "textFile": "Patch_Notes.txt"
+    },
+    {
+      "id": "redemption-in-rot-flesh-an-flintlock",
+      "title": "Redemption in Rot Flesh an Flintlock",
+      "folder": "Redemption in Rot Flesh an Flintlock",
+      "mainImage": "Redemption_in_Rot_Flesh_an_Flintlock.png",
+      "textFile": "Redemption_in_Rot_Flesh_an_Flintlock.txt"
+    },
+    {
+      "id": "star-crossed-salvagers",
+      "title": "Star-Crossed Salvagers",
+      "folder": "Star-Crossed Salvagers",
+      "mainImage": "Star-Crossed_Salvagers.png",
+      "textFile": "Star-Crossed_Salvagers.txt"
+    },
+    {
+      "id": "task-force-odin",
+      "title": "Task Force ODIN",
+      "folder": "Task Force ODIN",
+      "mainImage": "Task_Force_ODIN.png",
+      "textFile": "Task_Force_ODIN.txt"
+    },
+    {
+      "id": "projekt-absurdität",
+      "title": "Projekt Absurdität",
+      "folder": "Projekt Absurdität",
+      "mainImage": "Projekt_Absurdität.png",
+      "textFile": "Projekt_Absurdität.txt"
+    }
+  ]
+}
