@@ -59,10 +59,10 @@ export const Gallery: React.FC<GalleryProps> = ({ concepts, onSelectConcept }) =
       <div className="container mx-auto px-6 py-12">
         <div className="text-center mb-16">
           <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
-            Animated Series Concepts
+            Pixify AI Animated Series Concepts
           </h1>
           <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-            Explore our collection of original animated series concepts, each with unique worlds, characters, and stories waiting to be brought to life.
+            Explore our collection of our original animated series concepts, each with unique worlds, characters, and stories waiting to be brought to life.
           </p>
         </div>
 
