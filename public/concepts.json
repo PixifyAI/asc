@@ -62,6 +62,13 @@
       "folder": "Task Force ODIN",
       "mainImage": "Task_Force_ODIN.png",
       "textFile": "Task_Force_ODIN.txt"
+    },
+    {
+      "id": "projekt-absurditat",
+      "title": "Projekt Absurditat",
+      "folder": "Projekt Absurditat",
+      "mainImage": "Projekt_Absurditat.png",
+      "textFile": "Projekt_Absurditat.txt"
     }
   ]
 }
