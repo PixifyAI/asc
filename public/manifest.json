@@ -64,11 +64,11 @@
       "textFile": "Task_Force_ODIN.txt"
     },
     {
-      "id": "projekt-absurdität",
-      "title": "Projekt Absurdität",
-      "folder": "Projekt Absurdität",
-      "mainImage": "Projekt_Absurdität.png",
-      "textFile": "Projekt_Absurdität.txt"
+      "id": "projekt-absurditat",
+      "title": "Projekt Absurditat",
+      "folder": "Projekt Absurditat",
+      "mainImage": "Projekt_Absurditat.png",
+      "textFile": "Projekt_Absurditat.txt"
     }
   ]
 }
